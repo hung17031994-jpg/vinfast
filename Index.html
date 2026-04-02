@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TimeMark Pro - Fixed Version</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Text:wght@400&family=Roboto+Condensed:wght@300;400&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Roboto', sans-serif; background-color: #1a1a1a; color: white; user-select: none; -webkit-user-select: none; }
+        .canvas-container {
+            width: 100%; max-height: 70vh; overflow: auto; display: flex; justify-content: center; align-items: center;
+            background-image: linear-gradient(45deg, #2a2a2a 25%, transparent 25%), linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #2a2a2a 75%), linear-gradient(-45deg, transparent 75%, #2a2a2a 75%);
+            background-size: 20px 20px; border-radius: 8px; border: 2px dashed #4b5563;
+        }
+        canvas { max-width: 100%; height: auto; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5); }
+        #fullScreenPreview { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #000; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; }
+        #fullScreenImage { max-width: 100%; max-height: 85%; object-fit: contain; }
+        .preview-controls { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: center; gap: 15px; }
+        input[type=range] { -webkit-appearance: none; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 18px; width: 18px; border-radius: 50%; background: #eab308; cursor: pointer; margin-top: -7px; border: 2px solid #1a1a1a; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #4b5563; border-radius: 2px; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #fbbf24; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col md:flex-row" id="mainApp">
+
+    <div class="w-full md:w-1/3 lg:w-1/4 bg-gray-900 p-6 flex flex-col gap-4 overflow-y-auto border-r border-gray-700 h-screen md:h-auto">
+        <h1 class="text-2xl font-bold text-yellow-400 mb-2">TimeMark Pro</h1>
+        <div class="bg-gray-800 p-4 rounded-lg">
+            <label class="block text-sm text-gray-400 mb-1 font-medium">1. Chọn từ Album (Tối đa 2)</label>
+            <input type="file" id="uploadInput" accept="image/*" multiple 
+                class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-yellow-500 file:text-gray-900 hover:file:bg-yellow-400 cursor-pointer"/>
+        </div>
+
+        <div class="bg-gray-800 p-4 rounded-lg flex flex-col gap-3">
+            <h2 class="text-sm font-semibold text-gray-300 border-b border-gray-700 pb-2">Tùy chỉnh dấu mốc</h2>
+            <div>
+                <label class="text-xs text-gray-500">Giờ</label>
+                <input type="time" id="timeInput" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-yellow-500">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="text-xs text-gray-500">Ngày</label>
+                    <input type="date" id="dateInput" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500">Thứ</label>
+                    <input type="text" id="dayInput" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white">
+                </div>
+            </div>
+            <div>
+                <label class="text-xs text-gray-500">Địa điểm</label>
+                <textarea id="locationInput" rows="2" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white resize-none">Tây Thạnh, Thành Phố Hồ Chí Minh, Việt Nam</textarea>
+            </div>
+            <div class="mt-2 pt-2 border-t border-gray-700 space-y-4">
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-xs text-gray-400">Cỡ chữ (Scale)</label>
+                        <span id="scaleValue" class="text-xs text-yellow-400 font-bold">100%</span>
+                    </div>
+                    <input type="range" id="scaleInput" min="50" max="150" value="100" class="w-full">
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-xs text-gray-400">Viền chữ xám (Stroke)</label>
+                        <span id="strokeValue" class="text-xs text-yellow-400 font-bold">0px</span>
+                    </div>
+                    <input type="range" id="strokeInput" min="0" max="10" value="0" class="w-full">
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-xs text-gray-400">Bóng đổ toàn cục (Blur)</label>
+                        <span id="shadowBlurValue" class="text-xs text-yellow-400 font-bold">4px</span>
+                    </div>
+                    <input type="range" id="shadowBlurInput" min="0" max="20" value="4" class="w-full">
+                </div>
+                <div class="flex items-center gap-2 pt-2">
+                    <input type="checkbox" id="shadowCheck" checked class="w-4 h-4 text-yellow-500 rounded bg-gray-700 border-gray-600">
+                    <label for="shadowCheck" class="text-sm text-gray-300">Bật bóng đổ</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-auto pt-4 pb-10 md:pb-0">
+            <div id="fontStatus" class="text-xs text-yellow-500 mb-2 text-center animate-pulse italic">Đang tải font hệ thống...</div>
+            <div class="flex flex-col gap-2">
+                <button id="saveBtn" disabled class="w-full bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-bold py-3 px-4 rounded-lg transition-all flex justify-center items-center gap-2 disabled:opacity-50">
+                    Lưu tất cả ảnh
+                </button>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="shareBtn" disabled class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-2 rounded-lg transition disabled:opacity-50">Chia sẻ</button>
+                    <button id="viewBtn" disabled class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-2 rounded-lg transition disabled:opacity-50">Xem / Chụp</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex-1 bg-black p-4 flex flex-col items-center justify-center relative">
+        <div class="canvas-container" id="canvasContainer">
+            <div id="placeholderText" class="text-gray-500 text-center p-10"><p>Chọn 1 hoặc 2 ảnh để bắt đầu</p></div>
+            <canvas id="canvas" style="display: none;"></canvas>
+        </div>
+        <div class="loader absolute" id="loader"></div>
+    </div>
+
+    <div id="fullScreenPreview">
+        <img id="fullScreenImage" src="" alt="Result">
+        <div class="preview-controls">
+            <button onclick="closePreview()" class="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-8 rounded-full shadow-lg">Đóng</button>
+        </div>
+    </div>
+
+    <script>
+
+        const uploadInput = document.getElementById('uploadInput');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const loader = document.getElementById('loader');
+        const placeholderText = document.getElementById('placeholderText');
+        const fontStatus = document.getElementById('fontStatus');
+        const saveBtn = document.getElementById('saveBtn');
+        const shareBtn = document.getElementById('shareBtn');
+        const viewBtn = document.getElementById('viewBtn');
+        const timeInput = document.getElementById('timeInput');
+        const dateInput = document.getElementById('dateInput');
+        const dayInput = document.getElementById('dayInput');
+        const locationInput = document.getElementById('locationInput');
+        const shadowCheck = document.getElementById('shadowCheck');
+        const scaleInput = document.getElementById('scaleInput');
+        const scaleValue = document.getElementById('scaleValue');
+        const strokeInput = document.getElementById('strokeInput');
+        const strokeValue = document.getElementById('strokeValue');
+        const shadowBlurInput = document.getElementById('shadowBlurInput');
+        const shadowBlurValue = document.getElementById('shadowBlurValue');
+
+        let imageList = [];
+        let isFontsLoaded = false;
+
+        async function ensureFontLoaded() {
+            if (isFontsLoaded) return true;
+            try {
+                const fontSpecs = ["400 1em 'Big Shoulders Text'", "300 1em 'Roboto Condensed'", "400 1em 'Roboto Condensed'", "400 1em 'Roboto'", "700 1em 'Roboto'"];
+                await Promise.all(fontSpecs.map(f => document.fonts.load(f)));
+                await document.fonts.ready;
+                isFontsLoaded = true;
+                fontStatus.textContent = "Hệ thống Sẵn Sàng!";
+                fontStatus.className = "text-xs text-green-400 mb-2 text-center";
+                return true;
+            } catch (e) { return true; }
+        }
+
+        function initTime() {
+            const now = new Date();
+            timeInput.value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+            dateInput.value = now.toISOString().split('T')[0];
+            const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+            dayInput.value = days[now.getDay()];
+        }
+
+        function getLines(ctx, text, maxWidth) {
+            let words = text.split(" "), lines = [], currentLine = words[0];
+            for (let i = 1; i < words.length; i++) {
+                let width = ctx.measureText(currentLine + " " + words[i]).width;
+                if (width < maxWidth) currentLine += " " + words[i];
+                else { lines.push(currentLine); currentLine = words[i]; }
+            }
+            lines.push(currentLine); return lines;
+        }
+
+        async function drawCanvas(imgIndex = 0) {
+            const currentImage = imageList[imgIndex];
+            if (!currentImage) return;
+            await ensureFontLoaded();
+            const width = currentImage.width; const height = currentImage.height;
+            canvas.width = width; canvas.height = height;
+            ctx.clearRect(0, 0, width, height);
+            ctx.drawImage(currentImage, 0, 0, width, height);
+            const baseScale = height / 1000;
+            const userScalePercent = parseInt(scaleInput.value) / 100;
+            const leftScale = baseScale * 0.607 * userScalePercent;
+            const rightScale = baseScale * 0.7;
+            const globalShadowBlur = parseInt(shadowBlurInput.value) * baseScale;
+            
+            if (shadowCheck.checked) {
+                ctx.shadowColor = "rgba(0, 0, 0, 0.85)"; ctx.shadowBlur = globalShadowBlur;
+                ctx.shadowOffsetX = 2 * baseScale; ctx.shadowOffsetY = 2 * baseScale;
+            } else { ctx.shadowColor = "transparent"; }
+            
+            // --- CỤM BÊN TRÁI ---
+            const marginX = 40 * leftScale; const locFontSize = 41.5 * leftScale;
+            ctx.font = `400 ${locFontSize}px 'Roboto Condensed'`; ctx.fillStyle = "white"; ctx.textAlign = "left";
+            let finalLines = [];
+            locationInput.value.split('\n').forEach(line => finalLines = finalLines.concat(getLines(ctx, line, width * 0.6)));
+            const lineHeight = locFontSize * 1.2; const locationYBase = height - (25 * leftScale);
+            finalLines.reverse().forEach((line, i) => ctx.fillText(line, marginX, locationYBase - (i * lineHeight)));
+            const timeY = locationYBase - ((finalLines.length - 1) * lineHeight) - (55 * leftScale);
+            const timeText = timeInput.value; const timeFontSize = 145 * leftScale * 0.9;
+            ctx.font = `400 ${timeFontSize}px 'Big Shoulders Text'`; ctx.textBaseline = "bottom";
+            const strokeSize = parseInt(strokeInput.value) * leftScale;
+            if (strokeSize > 0) { ctx.strokeStyle = "#4a4a4a"; ctx.lineWidth = strokeSize; ctx.strokeText(timeText, marginX, timeY); }
+            ctx.fillText(timeText, marginX, timeY);
+            const timeWidth = ctx.measureText(timeText).width; const lineX = marginX + timeWidth + (20 * leftScale);
+            const lineYStart = timeY - (128 * leftScale);
+            ctx.beginPath(); ctx.moveTo(lineX, lineYStart); ctx.lineTo(lineX, lineYStart + (105 * leftScale));
+            ctx.lineWidth = 4 * leftScale; ctx.strokeStyle = "#fbbf24"; ctx.stroke();
+            const dateObj = new Date(dateInput.value);
+            ctx.font = `400 ${42.8 * leftScale}px 'Roboto Condensed'`;
+            ctx.fillText(`${dateObj.getDate()} Tháng ${dateObj.getMonth() + 1}, ${dateObj.getFullYear()}`, lineX + (20 * leftScale), lineYStart + (43 * leftScale));
+            ctx.font = `400 ${37.7 * leftScale}px 'Roboto Condensed'`; ctx.fillText(dayInput.value, lineX + (20 * leftScale), lineYStart + (112 * leftScale));
+            
+            // --- CỤM BÊN PHẢI (TimeMark + 100% Chân thực) ---
+            ctx.textAlign = "left";  
+            ctx.textBaseline = "alphabetic";
+            
+            const sloganText = "100% Chân thực";
+            ctx.font = `400 ${24 * rightScale}px 'Roboto'`;
+            const sloganWidth = ctx.measureText(sloganText).width;
+            
+            const blockEndX = width - (50 * rightScale); 
+            const startX = blockEndX - sloganWidth; 
+            const logoY = height - (70 * rightScale); 
+            
+            const baseSize = 50; 
+            ctx.font = `700 ${baseSize}px 'Roboto'`;
+            const baseTimeW = ctx.measureText("Time").width;
+            const baseMarkW = ctx.measureText("mark").width;
+            const baseTotalW = baseTimeW + baseMarkW;
+            
+            const scaleRatio = sloganWidth / baseTotalW; 
+            const finalTmSize = baseSize * scaleRatio;   
+            
+            ctx.font = `700 ${finalTmSize}px 'Roboto'`;
+            ctx.fillStyle = "#fbbf24"; 
+            ctx.fillText("Time", startX, logoY);
+            
+            const finalTimeW = baseTimeW * scaleRatio;
+            ctx.fillStyle = "white"; 
+            ctx.fillText("mark", startX + finalTimeW, logoY);
+            
+            ctx.font = `400 ${24 * rightScale}px 'Roboto'`;
+            ctx.fillStyle = "white";
+            ctx.fillText(sloganText, startX, logoY + (30 * rightScale));
+
+            // --- BARCODE DỌC (Cạnh phải) ---
+            if (!currentImage.markId) {
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                let id = '';
+                for (let i = 0; i < 14; i++) id += chars.charAt(Math.floor(Math.random() * chars.length));
+                currentImage.markId = id; 
+            }
+            
+            const idText = currentImage.markId;
+            const verifiedText = "Timemark Verified";
+            const spaceWidth = 15 * rightScale;
+            
+            ctx.font = `400 ${22 * rightScale}px 'Roboto'`; 
+            
+            const verifiedWidth = ctx.measureText(verifiedText).width;
+            const idWidth = ctx.measureText(idText).width;
+            const shieldW = 18 * rightScale;
+            const shieldH = 22 * rightScale;
+
+            const totalWidth = shieldW + spaceWidth + idWidth + spaceWidth + verifiedWidth;
+
+            ctx.save();
+            // CHỈNH SỬA Ở ĐÂY: Ép sát rạt lề phải (chỉ cách 6px)
+            ctx.translate(width - (6 * rightScale), height / 2);
+            ctx.rotate(-Math.PI / 2);
+
+            let currentX = -totalWidth / 2;
+
+            ctx.beginPath();
+            ctx.moveTo(currentX + shieldW/2, 0); 
+            ctx.lineTo(currentX + shieldW, -shieldH * 0.4); 
+            ctx.lineTo(currentX + shieldW, -shieldH); 
+            ctx.lineTo(currentX, -shieldH); 
+            ctx.lineTo(currentX, -shieldH * 0.4); 
+            ctx.closePath();
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.75)";
+            ctx.lineWidth = 1.5 * rightScale;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(currentX + shieldW * 0.25, -shieldH * 0.55);
+            ctx.lineTo(currentX + shieldW * 0.45, -shieldH * 0.35);
+            ctx.lineTo(currentX + shieldW * 0.75, -shieldH * 0.75);
+            ctx.stroke();
+            
+            currentX += shieldW; 
+            currentX += spaceWidth; 
+
+            ctx.fillStyle = "rgba(255, 255, 255, 0.75)"; 
+            ctx.textAlign = "left"; 
+            ctx.textBaseline = "middle"; 
+
+            ctx.fillText(idText, currentX, -shieldH/2);
+            currentX += idWidth; 
+            currentX += spaceWidth; 
+
+            ctx.fillText(verifiedText, currentX, -shieldH/2);
+
+            ctx.restore();
+        }
+
+        uploadInput.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files).slice(0, 2);
+            if (files.length === 0) return;
+            loader.style.display = 'block';
+            await ensureFontLoaded();
+            imageList = [];
+            for (const file of files) {
+                const img = await new Promise(res => {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => { 
+                        const i = new Image(); 
+                        i.crossOrigin = "anonymous";
+                        i.onload = () => res(i); 
+                        i.src = ev.target.result; 
+                    };
+                    reader.readAsDataURL(file);
+                });
+                imageList.push(img);
+            }
+            placeholderText.style.display = 'none'; canvas.style.display = 'block';
+            drawCanvas(0); loader.style.display = 'none';
+            [saveBtn, shareBtn, viewBtn].forEach(b => b.disabled = false);
+        });
+
+        saveBtn.addEventListener('click', async () => {
+            if (imageList.length === 0) return;
+            for (let i = 0; i < imageList.length; i++) {
+                await drawCanvas(i);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+                if (window.Android && window.Android.saveBase64Image) {
+                    window.Android.saveBase64Image(dataUrl);
+                } else {
+                    const a = document.createElement('a'); a.download = `tm_${i+1}.jpg`; a.href = dataUrl; a.click();
+                }
+            }
+        });
+
+        viewBtn.addEventListener('click', async () => { 
+            await drawCanvas(0); 
+            document.getElementById('fullScreenImage').src = canvas.toDataURL('image/jpeg', 1.0); 
+            document.getElementById('fullScreenPreview').style.display = 'flex'; 
+        });
+
+        function closePreview() { document.getElementById('fullScreenPreview').style.display = 'none'; }
+        scaleInput.addEventListener('input', (e) => { scaleValue.textContent = e.target.value + '%'; drawCanvas(0); });
+        strokeInput.addEventListener('input', (e) => { strokeValue.textContent = e.target.value + 'px'; drawCanvas(0); });
+        shadowBlurInput.addEventListener('input', (e) => { shadowBlurValue.textContent = e.target.value + 'px'; drawCanvas(0); });
+        [timeInput, dateInput, dayInput, locationInput, shadowCheck].forEach(i => i.addEventListener('input', () => drawCanvas(0)));
+        initTime();
+    </script>
+</body>
+</html>
